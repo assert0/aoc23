@@ -13,7 +13,7 @@ fn main() {
     let (day, dayargs) = (&args[1], &args[2..]);
     match day.as_ref() {
         "day1" => days::day1::day1(dayargs),
-        // "day2" => days::day2::day2(dayargs),
+        "day2" => days::day2::day2(dayargs),
         // "day3" => days::day3::day3(dayargs),
         // "day4" => days::day4::day4(dayargs),
         // "day5" => days::day5::day5(dayargs),
