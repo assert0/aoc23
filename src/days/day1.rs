@@ -12,7 +12,7 @@ pub fn day1(args: &[String]) {
     let contents = fs::read_to_string(filename)
         .expect("Something went wrong reading the file");
 
-    let part1: u32 = contents.split("\n")
+    let part1: u32 = contents.lines()
         .map(|l| l.chars().filter_map(|c| c.to_digit(10)).collect::<Vec<_>>())
         .filter(|n| n.len() > 0)
         .map(|n| n.first().unwrap() * 10 + n.last().unwrap())

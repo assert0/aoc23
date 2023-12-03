@@ -90,7 +90,7 @@ pub fn day2(args: &[String]) {
     let contents = fs::read_to_string(filename)
         .expect("Something went wrong reading the file");
 
-    let games: Vec<Game> = contents.split("\n")
+    let games: Vec<Game> = contents.lines()
         .map(|l| l.parse::<Game>().unwrap())
         .collect();
 
@@ -104,5 +104,5 @@ pub fn day2(args: &[String]) {
         .map(|g: &Game| g.power())
         .sum();
     println!("Part 2: {}", part2);
-    
+
 }
