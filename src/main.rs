@@ -16,7 +16,7 @@ fn main() {
         "day2" => days::day2::day2(dayargs),
         "day3" => days::day3::day3(dayargs),
         "day4" => days::day4::day4(dayargs),
-        // "day5" => days::day5::day5(dayargs),
+        "day5" => days::day5::day5(dayargs),
         // "day6" => days::day6::day6(dayargs),
         // "day7" => days::day7::day7(dayargs),
         // "day8" => days::day8::day8(dayargs),

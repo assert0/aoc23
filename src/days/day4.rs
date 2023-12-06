@@ -73,7 +73,17 @@ pub fn day4(args: &[String]) {
         .map(|c| c.winning_numbers().len())
         .collect();
 
+    // recursive
     let part2: u32 = (0..counts.len())
         .map(|i| part2_instances(&counts, i, 0)).sum();
     println!("Part 2: {}", part2);
+
+    // non-recursive
+    let mut copies = vec![1; counts.len()];
+    for (i, count) in counts.iter().enumerate() {
+        for j in i+1..i+1+count {
+            copies[j] += copies[i]
+        }
+    }
+    println!("Part 2: {}", copies.iter().sum::<u32>());
 }
