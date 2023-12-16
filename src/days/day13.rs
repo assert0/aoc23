@@ -1,49 +1,74 @@
 use std::fs;
-use std::str::FromStr;
-use std::num::ParseIntError;
 use itertools::iproduct;
 use std::iter::zip;
 
-#[derive(Clone, Eq, PartialEq, Debug)]
-struct Pattern {
-    map: Vec<Vec<char>>,
-}
+type Map = Vec<Vec<char>>;
 
-impl FromStr for Pattern {
-    type Err = ParseIntError;
+trait Score {
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Self {
-            map: s.lines().map(|l| l.chars().collect()).collect(),
-        })
+    fn transform(&self, map: &Map) -> Map {
+        let mut map2 = vec![vec!['_'; map.len()]; map[0].len()];
+        iproduct!(0..map.len(), 0..map[0].len())
+            .for_each(|(y, x)| map2[x][y] = map[y][x]);
+        map2
     }
 
+    fn valid_fold_row(&self, rmap: &Map, row: usize) -> bool;
+
+    fn mirror_row(&self, map: &Map) -> Option<usize> {
+        (0..map.len()).filter(|i| self.valid_fold_row(map, *i)).next()
+    }
+
+    fn score(&self, map: &Map) -> usize {
+        match self.mirror_row(map) {
+            Some(v) => (v + 1) * 100,
+            None => {
+                match self.mirror_row(&self.transform(map)) {
+                    Some(v) => v + 1,
+                    None => unreachable!()
+                }
+            }
+        }
+    }
 }
 
-impl Pattern {
+#[derive(Clone, Eq, PartialEq, Debug)]
+struct Part1 {
+    map: Map
+}
 
-    fn valid_fold_row(&self, row: usize) -> bool {
+impl Score for Part1 {
+
+    fn valid_fold_row(&self, map: &Map, row: usize) -> bool {
         let mut dist: usize = 0;
         loop {
-            if (row as isize - dist as isize) < 0 || row + dist + 1 >= self.map.len() {
+            if (row as isize - dist as isize) < 0 || row + dist + 1 >= map.len() {
                 break;
             }
-            if self.map[row - dist] != self.map[row + dist + 1] {
+            if map[row - dist] != map[row + dist + 1] {
                 return false;
             }
             dist += 1; 
         }
         dist > 0
     }
+}
 
-    fn valid_fold_row2(&self, row: usize) -> bool {
+#[derive(Clone, Eq, PartialEq, Debug)]
+struct Part2 {
+    map: Map
+}
+
+impl Score for Part2 {
+
+    fn valid_fold_row(&self, map: &Map, row: usize) -> bool {
         let mut dist: usize = 0;
         let mut diffcount = 0;
         loop {
-            if (row as isize - dist as isize) < 0 || row + dist + 1 >= self.map.len() {
+            if (row as isize - dist as isize) < 0 || row + dist + 1 >= map.len() {
                 break;
             }
-            diffcount += zip(self.map[row - dist].iter(), self.map[row + dist + 1].iter())
+            diffcount += zip(map[row - dist].iter(), map[row + dist + 1].iter())
                             .filter(|(a, b)| a != b).count();
             if diffcount > 1 {
                 return false;
@@ -51,21 +76,6 @@ impl Pattern {
             dist += 1; 
         }
         dist > 0 && diffcount == 1
-    }
-
-    fn transform(&self) -> Pattern {
-        let mut map = vec![vec!['_'; self.map.len()]; self.map[0].len()];
-        iproduct!(0..self.map.len(), 0..self.map[0].len())
-            .for_each(|(y, x)| map[x][y] = self.map[y][x]);
-        Pattern { map }
-    }
-
-    fn mirror_row(&self) -> Option<usize> {
-        (0..self.map.len()).filter(|i| self.valid_fold_row(*i)).next()
-    }
-
-    fn mirror_row2(&self) -> Option<usize> {
-        (0..self.map.len()).filter(|i| self.valid_fold_row2(*i)).next()
     }
 }
 
@@ -80,33 +90,23 @@ pub fn day13(args: &[String]) {
     let contents = fs::read_to_string(filename)
         .expect("Something went wrong reading the file");
     
-    // Part 1
-    let patterns: Vec<Pattern> = contents.split("\n\n")
-                    .map(|p| p.parse().unwrap()).collect();
+    let patterns: Vec<Vec<Vec<char>>> = contents.split("\n\n")
+                    .map(|p| p.lines()
+                        .map(|l| l.chars().collect()).collect()
+                    ).collect();
 
+    // Part 1
     let part1: usize = patterns.iter().map(|p| {
-            match p.mirror_row() {
-                Some(v) => (v + 1) * 100,
-                None => {
-                    match p.transform().mirror_row() {
-                        Some(v) => v + 1,
-                        None => unreachable!()
-                    }
-                }
-            }
+            let pattern = Part1 { map: p.to_vec() };
+            pattern.score(&pattern.map)
         }).sum();
     println!("Part 1: {}", part1);
 
+    // Part 2
     let part2: usize = patterns.iter().map(|p| {
-            match p.mirror_row2() {
-                Some(v) => (v + 1) * 100,
-                None => {
-                    match p.transform().mirror_row2() {
-                        Some(v) => v + 1,
-                        None => unreachable!()
-                    }
-                }
-            }
-        }).sum();
+        let pattern = Part2 { map: p.to_vec() };
+        pattern.score(&pattern.map)
+    }).sum();
     println!("Part 2: {}", part2);
+
 }
