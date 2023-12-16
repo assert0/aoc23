@@ -1,147 +1,60 @@
 use std::fs;
+use itertools::Itertools;
+use std::iter::zip;
+use regex::Regex;
 use std::str::FromStr;
 use std::num::ParseIntError;
-use std::cmp::Ordering;
-use std::collections::BinaryHeap;
-use itertools::iproduct;
 
-lazy_static! {
-    static ref ADJ: Vec<(isize, isize)> = vec![
-        (0, 1), (0, -1), (1, 0), (-1, 0)
-    ];
+
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub struct Spring {
+    condition: String,
+    counts: Vec<usize>,
 }
 
-pub fn adjacent(pos: (isize, isize)) -> Vec<(isize, isize)> {
-    ADJ.iter().map(|(dy, dx)| (pos.0 + dy, pos.1 + dx)).collect()
-}
-
-pub fn get_value(map: &Vec<Vec<u32>>, pos: (isize, isize)) -> u32 {
-    let (my, mx) = (map.len(), map[0].len());
-    if pos.0 >= 0 && pos.1 >= 0 && pos.0 < my as isize && pos.1 < mx as isize {
-        return map[pos.0 as usize][pos.1 as usize];
-    }
-    u32::MAX
-}
-
-
-const ITEMSET: &str = "abcdefghijklmnopqrstuvwxyz";
-
-#[derive(Copy, Clone, Eq, PartialEq, Debug)]
-struct State {
-    steps: u32,
-    position: (usize, usize),
-}
-
-// The priority queue depends on `Ord`.
-// Explicitly implement the trait so the queue becomes a min-heap
-// instead of a max-heap.
-impl Ord for State {
-    fn cmp(&self, other: &Self) -> Ordering {
-        // Notice that the we flip the ordering on costs.
-        // In case of a tie we compare positions - this step is necessary
-        // to make implementations of `PartialEq` and `Ord` consistent.
-        other.steps.cmp(&self.steps)
-            .then_with(|| self.position.cmp(&other.position))
-    }
-}
-
-// `PartialOrd` needs to be implemented as well.
-impl PartialOrd for State {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-// derived from https://doc.rust-lang.org/std/collections/binary_heap/index.html
-pub fn shortest_path(map: &Vec<Vec<u32>>, start: (usize, usize), end: (usize, usize)) -> Option<u32> {
-    let (ysize, xsize) = (map.len(), map[0].len());
-    let mut loweststeps = vec![vec![u32::MAX; xsize]; ysize];
-
-    let mut heap = BinaryHeap::new();
-
-    // `start` with a zero steps
-    loweststeps[0][0] = 0;
-    heap.push(State { steps: 0, position: start });
-
-    // Examine lower steps positions first (min-heap)
-    while let Some(State { steps, position }) = heap.pop() {
-        if position == end { 
-            return Some(steps); 
-        }
-
-        // Important as we may have already found a better way
-        if steps > loweststeps[position.0][position.1] { 
-            continue; 
-        }
-        let current = get_value(&map, (position.0 as isize, position.1 as isize));
-
-        // For each node we can reach, see if we can find a way with
-        // a lower steps going through this node
-        for adj in adjacent((position.0 as isize, position.1 as isize)) {
-            let adj_elev = get_value(&map, (adj.0, adj.1));
-            if adj_elev <= current + 1 {
-                let next = State { steps: steps + 1, position: (adj.0 as usize, adj.1 as usize) };
-
-                // If so, add it to the frontier and continue
-                if next.steps < loweststeps[next.position.0][next.position.1] {
-                    heap.push(next);
-                    // Relaxation, we have now found a better way
-                    loweststeps[next.position.0][next.position.1] = next.steps;
-                }
-            }
-        }
-    }
-    // Goal not reachable
-    None
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Map {
-    start: (usize, usize),
-    end: (usize, usize),
-    elevation: Vec<Vec<u32>>,
-}
-
-impl FromStr for Map {
+impl FromStr for Spring {
     type Err = ParseIntError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let map: Vec<Vec<char>> = s.lines()
-            .map(|l| l.chars().collect())
-            .collect();
-        let start = get_char_position(&map, 'S');
-        let end = get_char_position(&map, 'E');
-        let s = s.replace("S", "a").replace("E", "z");
-        let elevation: Vec<Vec<u32>> = s.lines()
-            .map(|l| l.chars().map(|c| ITEMSET.find(c).unwrap() as u32).collect())
-            .collect();
+        lazy_static! {
+            static ref RE: Regex = Regex::new(r"([#\.\?]+) ([\d\,]+)").unwrap();
+        }
+        let caps = RE.captures(s).unwrap();
         Ok(Self {
-            start,
-            end,
-            elevation
+            condition: caps[1].to_string(),
+            counts: caps[2].split(',').map(|c| c.parse().unwrap()).collect()
         })
     }
+
 }
 
-pub fn get_char_position(map: &Vec<Vec<char>>, c: char) -> (usize, usize) {
-    let (ysize, xsize) = (map.len(), map[0].len());
-    for (y, x) in iproduct!(0..ysize, 0..xsize) {
-        if map[y][x] == c {
-            return (y, x)
-        }
+impl Spring {
+
+    fn new(condition: String, counts: Vec<usize>) -> Self {
+        Self { condition, counts }
     }
-    panic!("No match");
+
+    fn is_valid(&self, cond: String) -> bool {
+        if cond.contains("?") { return false }
+        cond.split(".").map(|c| c.len())
+            .filter(|c| *c > 0)
+            .collect::<Vec<usize>>() == self.counts
+    }
+
+    fn is_invalid(&self) -> bool {
+        self.condition.split(".").map(|c| c.len()).sum::<usize>() < self.counts.iter().sum()
+    }
+
+    fn populate(&self, fill: String) -> String {
+        // let result = self.condition.clone();
+        let mut it = fill.chars();
+        self.condition.chars().map(|c| if c == '?' { it.next().unwrap() } else { c }).collect()
+    }
+
 }
 
-pub fn starting_elevations(map: &Vec<Vec<u32>>) -> Vec<(usize, usize)> {
-    let (ysize, xsize) = (map.len(), map[0].len());
-    let mut all_a = vec![];
-    for (y, x) in iproduct!(0..ysize, 0..xsize) {
-        if map[y][x] == 0 {
-            all_a.push((y, x));
-        }
-    }
-    all_a
+fn num_to_string(num: u32, count: u32) -> String {
+    (0..count).rev().map(|i| if num>>i & 1 == 1 { '#' } else { '.' }).collect()
 }
 
 pub fn day12(args: &[String]) {
@@ -155,15 +68,76 @@ pub fn day12(args: &[String]) {
     let contents = fs::read_to_string(filename)
         .expect("Something went wrong reading the file");
 
-    let map: Map = contents.parse().unwrap();
-
     // Part 1
-    println!("Part 1: {}", shortest_path(&map.elevation, map.start, map.end).unwrap());
+    let springs: Vec<Spring> = contents.lines()
+        .map(|l| l.parse().unwrap())
+        .collect();
+    // println!("{:?}", springs);
+
+    let mut part1 = 0;
+    for spring in springs {
+        let mut valid = 0;
+        let unk_len = spring.condition.chars().filter(|c| *c == '?').count() as u32;
+        let unk_count = 2u32.pow(unk_len);
+        for j in 0..unk_count {
+            let n = num_to_string(j, unk_len);
+            let p = spring.populate(n.clone());
+            if spring.is_valid(p.clone()) {
+                // println!("{} {} {}", spring.condition, n, p);
+                valid += 1;
+            }
+        }
+        part1 += valid;
+        // println!("{} = {}", spring.condition, valid);
+    }
+    println!("Part 1: {}", part1);
 
     // Part 2
-    let part2 = starting_elevations(&map.elevation).iter()
-        .filter_map(|&p| shortest_path(&map.elevation, p, map.end))
-        .min().unwrap();
+    let mut valids: Vec<_> = vec![];
+    for repeat in 1..=2 {
+        println!("repeat: {}", repeat);
+        let springs2: Vec<Spring> = contents.lines()
+            .map(|l| {
+                let (l, r) = l.split_whitespace().next_tuple().unwrap();
+                let s = vec![vec![l].repeat(repeat).join("?"), vec![r].repeat(repeat).join(",")].join(" ");
+                s.parse().unwrap()
+            }).collect();
+
+        //valids.push(springs2.into_iter().map(|s| solve(s)).collect::<Vec<_>>());
+        // for spring in springs2 {
+        //     let s = solve(spring.clone());
+        //     println!("{} {}", spring.condition, s);
+        //     part2 += s;
+        //     // println!("{} = {}", spring.condition, valid);
+        // }
+        let mut valid = vec![];
+        for (i, spring) in springs2.iter().enumerate() {
+            let s = solve(spring.clone());
+            println!("{:4}: {} = {}", i, spring.condition, s);
+            valid.push(s);
+            // println!("{} = {}", spring.condition, valid);
+        }
+        valids.push(valid);
+    }
+    println!("{:?}", valids);
+    let part2: usize = zip(&valids[0], &valids[1]).map(|(a, b)| (a, b / a))
+            .map(|(a, x) | a * x.pow(4))
+            .sum();
     println!("Part 2: {}", part2);
+}
+
+fn solve(spring: Spring) -> usize {
+    if spring.is_invalid() { return 0 }
+    match spring.condition.chars().position(|c| c == '?') {
+        Some(pos) => {
+            let mut a = spring.condition.clone();
+            a.replace_range(pos..pos+1, ".");
+            let mut b = spring.condition.clone();
+            b.replace_range(pos..pos+1, "#");
+            return solve(Spring::new(a, spring.counts.clone())) + solve(Spring::new(b, spring.counts.clone()))
+        }
+        //None => { assert!(spring.clone().is_valid(spring.condition)); return 1 }
+        None => return if spring.clone().is_valid(spring.condition) { 1 } else { 0 }
+    }
 }
 
