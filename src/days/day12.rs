@@ -53,6 +53,13 @@ impl Spring {
 
 }
 
+fn is_valid(cond: &str, counts: &Vec<usize>) -> bool {
+    if cond.contains("?") { return false }
+    cond.split(".").map(|c| c.len())
+        .filter(|c| *c > 0)
+        .collect::<Vec<usize>>() == *counts
+}
+
 fn num_to_string(num: u32, count: u32) -> String {
     (0..count).rev().map(|i| if num>>i & 1 == 1 { '#' } else { '.' }).collect()
 }
@@ -112,7 +119,7 @@ pub fn day12(args: &[String]) {
         // }
         let mut valid = vec![];
         for (i, spring) in springs2.iter().enumerate() {
-            let s = solve(spring.clone());
+            let s = solve(&spring.condition, &spring.counts, 0, 0);
             println!("{:4}: {} = {}", i, spring.condition, s);
             valid.push(s);
             // println!("{} = {}", spring.condition, valid);
@@ -126,18 +133,40 @@ pub fn day12(args: &[String]) {
     println!("Part 2: {}", part2);
 }
 
-fn solve(spring: Spring) -> usize {
-    if spring.is_invalid() { return 0 }
-    match spring.condition.chars().position(|c| c == '?') {
-        Some(pos) => {
-            let mut a = spring.condition.clone();
-            a.replace_range(pos..pos+1, ".");
-            let mut b = spring.condition.clone();
-            b.replace_range(pos..pos+1, "#");
-            return solve(Spring::new(a, spring.counts.clone())) + solve(Spring::new(b, spring.counts.clone()))
-        }
-        //None => { assert!(spring.clone().is_valid(spring.condition)); return 1 }
-        None => return if spring.clone().is_valid(spring.condition) { 1 } else { 0 }
+fn solve(condition: &str, counts: &Vec<usize>, start: usize) -> usize {
+    if !condition.contains("?") && counts.len() == 0 { return 1 }
+    let mut s = start;
+    let mut next_counts = counts.into_iter().filter(|&c| *c > 0).collect();
+    loop {
+        let mut a = condition.to_string();
+        println!("{}", a);
+        match a.chars().skip(s).next().unwrap() {
+            '.' => {
+                s += 1;
+                continue;
+            },
+            '?' => {
+                a.replace_range(s..s+1, ".");
+                solve(&a, counts, s+1);
+                a.replace_range(s..s+1, "#");
+                solve(&a, counts, s+1);
+            },
+            '#' => {
+                next_counts[0] -= 1;
+            },
+            _ => unreachable!()
+        } 
     }
+    // match spring.condition.chars().position(|c| c == '?') {
+    //     Some(pos) => {
+    //         let mut a = spring.condition.clone();
+    //         a.replace_range(pos..pos+1, ".");
+    //         let mut b = spring.condition.clone();
+    //         b.replace_range(pos..pos+1, "#");
+    //         return solve(Spring::new(a, spring.counts.clone())) + solve(Spring::new(b, spring.counts.clone()))
+    //     }
+    //     //None => { assert!(spring.clone().is_valid(spring.condition)); return 1 }
+    //     None => return if spring.clone().is_valid(spring.condition) { 1 } else { 0 }
+    // }
 }
 
